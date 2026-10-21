@@ -1,0 +1,124 @@
+# Requisitos do TaskAnalyzer em formato estruturado (Fase 3).
+# Versão legível por máquina do contrato SDD (specs/system_design_document.pdf
+# e specs/task_analyzer_spec.md). Em caso de divergência, a spec prevalece.
+
+projeto:
+  nome: sdd-task-analyzer
+  versao: 1.0.0
+  autor: Alysson Kennedy de Oliveira Carvalho
+  ra: "22450680"
+  metodologia: SDD (Spec-Driven Development)
+  fonte_da_verdade: specs/task_analyzer_spec.md
+  regras_de_contexto: CONTEXT_RULES.md
+
+ambiente:
+  linguagem: python
+  versao_minima: "3.11"
+  dependencias_src: []            # apenas biblioteca padrão (DA-09 / PR-01)
+  dependencias_testes:
+    - pytest>=8.0
+  imagem_docker: python:3.11-slim
+  ci:
+    plataforma: GitHub Actions
+    arquivo: .github/workflows/ci.yml
+    runner: ubuntu-latest
+    gatilhos: [push, pull_request]
+    branches: [main, develop]
+    comando_testes: pytest tests/test_harness.py -v
+
+interface_publica:
+  modulo: src/task_analyzer.py
+  funcoes:
+    - assinatura: "analisar_tarefas(tarefas: list[Tarefa], ignorar_inconsistentes: bool = False) -> RelatorioMetricas"
+      divisao_por_zero: SemTarefasConcluidasError
+    - assinatura: "analyze_tasks(tasks: list[dict[str, Any]]) -> dict[str, Any]"
+      divisao_por_zero: "retorna 0.0"
+    - assinatura: "validar_tarefa(tarefa: Tarefa) -> None"
+    - assinatura: "calcular_tempo_conclusao_min(tarefa: Tarefa) -> float"
+    - assinatura: "esta_atrasada(tarefa: Tarefa) -> bool"
+  excecoes:
+    TaskAnalyzerError: Exception
+    TaskValidationError: TaskAnalyzerError
+    DatasInvalidasError: TaskValidationError
+    ValorEnumInvalidoError: TaskValidationError
+    SemTarefasConcluidasError: TaskAnalyzerError
+  enums:
+    prioridade: [baixa, media, alta]
+    status: [concluida, pendente, cancelada]
+
+regras_de_negocio:
+  - id: RN-01
+    descricao: Apenas tarefas com status "concluida" entram no cálculo de tempo e atraso.
+  - id: RN-02
+    descricao: Tempo de conclusão = data_conclusao - data_inicio, em minutos (float).
+  - id: RN-03
+    descricao: Atraso quando data_conclusao > prazo; conclusão exatamente no prazo não é atraso.
+  - id: RN-04
+    descricao: Datas inconsistentes disparam DatasInvalidasError; com ignorar_inconsistentes=True a tarefa é descartada com WARNING.
+  - id: RN-05
+    descricao: Sem tarefas concluídas válidas, analisar_tarefas dispara SemTarefasConcluidasError; nunca NaN, infinito ou ZeroDivisionError.
+  - id: RN-06
+    descricao: Todo datetime deve ser timezone-aware em UTC; naive dispara DatasInvalidasError.
+  - id: RN-07
+    descricao: Arredondamento com round(valor, 2) para tempos e percentuais.
+  - id: RN-08
+    descricao: Prioridade ou status fora dos valores permitidos dispara ValorEnumInvalidoError.
+  - id: RN-09
+    descricao: Módulo puro, sem arquivos, rede ou estado.
+  - id: RN-10
+    descricao: Descartes e erros registrados com logging (WARNING / ERROR).
+
+requisitos_nao_funcionais:
+  - id: RNF-01
+    descricao: Type hints em 100% das funções e docstrings Google style.
+  - id: RNF-02
+    descricao: Testes determinísticos, sem rede, arquivos ou datetime.now().
+  - id: RNF-03
+    descricao: 100% dos testes aprovados no CI antes de qualquer merge em develop ou main.
+  - id: RNF-04
+    descricao: Execução reproduzível em container com um único comando (docker compose run --rm tests).
+  - id: RNF-05
+    descricao: Container sem rede, com sistema de arquivos somente leitura e usuário não-root.
+
+cenarios_de_aceite:
+  - id: C1
+    descricao: Métricas corretas com o conjunto de referência (6 tarefas, 4 concluídas).
+    esperado:
+      tempo_medio_conclusao_min: 97.5
+      taxa_atraso_percentual: 50.0
+      quantidade_tarefas: 4
+      tempo_medio_conclusao_horas: 1.62
+      por_prioridade:
+        alta: {tempo_medio_conclusao_min: 150.0, taxa_atraso_percentual: 50.0, quantidade_tarefas: 2}
+        media: {tempo_medio_conclusao_min: 30.0, taxa_atraso_percentual: 0.0, quantidade_tarefas: 1}
+        baixa: {tempo_medio_conclusao_min: 60.0, taxa_atraso_percentual: 100.0, quantidade_tarefas: 1}
+    testes: [test_metricas_corretas_com_tarefas_validas, test_analyze_tasks_cenario_1_sucesso]
+  - id: C2a
+    descricao: Datas inconsistentes disparam exceção.
+    esperado: DatasInvalidasError / TaskValidationError
+    testes: [test_datas_inconsistentes_disparam_excecao, test_analyze_tasks_conclusao_anterior_a_criacao]
+  - id: C2b
+    descricao: Lista vazia ou sem concluídas (divisão por zero).
+    esperado: SemTarefasConcluidasError em analisar_tarefas; 0.0 em analyze_tasks
+    testes: [test_sem_tarefas_concluidas_dispara_excecao, test_analyze_tasks_casos_de_borda_retornam_zero]
+  - id: C3
+    descricao: Conclusão exatamente no prazo não é atraso.
+    testes: [test_conclusao_no_prazo_nao_e_atraso]
+  - id: C4
+    descricao: Modo tolerante descarta a tarefa inconsistente e registra WARNING.
+    testes: [test_modo_tolerante_descarta_e_loga]
+  - id: C5
+    descricao: Prioridade "urgente" dispara ValorEnumInvalidoError.
+    testes: [test_prioridade_invalida]
+  - id: C6
+    descricao: Datetime naive dispara DatasInvalidasError.
+    testes: [test_datetime_naive_e_rejeitado]
+  - id: C7
+    descricao: Prioridade sem tarefas concluídas retorna (0.0, 0.0, 0).
+    testes: [test_prioridade_sem_tarefas_retorna_zeros]
+
+criterios_de_entrega:
+  total_testes: 13
+  aprovacao_minima_percentual: 100
+  build_ci: verde em main
+  release: v1.0.0
