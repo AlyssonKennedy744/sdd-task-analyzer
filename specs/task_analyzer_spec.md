@@ -1,6 +1,6 @@
 # Especificação SDD — TaskAnalyzer
 
-> **Bootcamp III** — Fase 1 (Especificação) transposta para Markdown na Fase 2.
+> **Bootcamp III** — Fase 1 (Especificação) transposta para Markdown na Fase 2, com adendo de infraestrutura da Fase 3.
 > **Autor:** Alysson Kennedy De Oliveira Carvalho — RA 22450680 — Ciência da Computação
 > **Documento original (Fase 1):** <https://docs.google.com/document/d/1Ny_yeHMhACTk1Ub99IKmHsBKew4pHGEn9ztChiCxRGo/edit?usp=sharing>
 
@@ -217,18 +217,29 @@ de abrir Pull Request, testes determinísticos (sem rede, arquivos ou `datetime.
 
 ## 3. Estrutura do Repositório
 
+Estrutura final (Fase 3), autorizada pelo enunciado do Desafio Final e registrada aqui para
+manter a PR-03 válida:
+
 ```
 sdd-task-analyzer/
-├── README.md
-├── CONTEXT_RULES.md
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # Motor CI/CD (GitHub Actions)
+├── Dockerfile                        # Empacotamento (python:3.11-slim)
+├── docker-compose.yml                # Orquestração da suíte isolada
+├── .dockerignore
+├── CONTEXT_RULES.md                  # Base de governança (Fase 1)
+├── specs/
+│   ├── system_design_document.pdf    # SDD consolidado (Fases 1 a 3)
+│   ├── requirements.yaml             # Requisitos em formato estruturado
+│   └── task_analyzer_spec.md         # Contrato executável (fonte da verdade)
+├── tests/
+│   └── test_harness.py               # Suíte de testes (Fase 2)
+├── src/
+│   └── task_analyzer.py              # Código gerado por IA e homologado (Fase 2)
 ├── .gitignore
 ├── requirements.txt
-├── specs/
-│   └── task_analyzer_spec.md
-├── tests/
-│   └── test_harness.py
-└── src/
-    └── task_analyzer.py
+└── README.md
 ```
 
 ## 4. Versionamento (Git Flow simplificado)
@@ -237,4 +248,46 @@ sdd-task-analyzer/
 - Commits atômicos no padrão Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - Todo código chega à `develop` e à `main` exclusivamente via Pull Request.
 - Cada PR descreve: cenário atendido, prompt utilizado, trechos gerados por IA e resultado do pytest.
-- Tag `v0.1.0` ao final da Fase 2.
+- Tag `v0.1.0` ao final da Fase 2 e `v1.0.0` ao final da Fase 3.
+- Fase 3: merge em `develop` e `main` só com o workflow `CI` verde (IN-01).
+
+---
+
+## 5. Adendo Fase 3 — CI/CD, Containerização e Governança
+
+O contrato de negócio (seções 1 e 2) **não muda** na Fase 3. As alterações são apenas de
+infraestrutura: o mesmo código e os mesmos 13 testes passam a rodar de forma automática e isolada.
+
+### 5.1 Integração Contínua (`.github/workflows/ci.yml`)
+
+| Item | Definição |
+|------|-----------|
+| Gatilhos | `push` e `pull_request` nas branches `main` e `develop` (e `workflow_dispatch`). |
+| Ambiente | `ubuntu-latest` com Python 3.11 (`actions/setup-python`). |
+| Preparação | `pip install -r requirements.txt`. |
+| Execução | `pytest tests/test_harness.py -v`. |
+| Job `docker` | Depende do job `test`: `docker build` + `docker compose run --rm tests`. |
+| Critério | Build verde (13 passed) obrigatório antes do merge (IN-01). |
+
+### 5.2 Containerização (`Dockerfile` e `docker-compose.yml`)
+
+| Item | Definição |
+|------|-----------|
+| Imagem base | `python:3.11-slim` (leve e imutável). |
+| Conteúdo | `requirements.txt`, `src/` e `tests/` (o `.dockerignore` exclui `.git`, specs e docs). |
+| Usuário | `analyzer` (UID 1000), sem privilégios de root. |
+| Comando padrão | `CMD ["pytest", "tests/test_harness.py", "-v"]`. |
+| Orquestração | Serviço `tests`: `docker compose run --rm tests`, com `network_mode: none` e `read_only: true` (reforça a RN-09). |
+
+### 5.3 Requisitos estruturados
+
+`specs/requirements.yaml` repete, em formato legível por máquina, as regras de negócio, as
+assinaturas públicas, os cenários de aceite com os valores esperados e os critérios de entrega.
+`specs/system_design_document.pdf` é a versão consolidada desta especificação para leitura e
+auditoria. Se houver divergência, este arquivo (`task_analyzer_spec.md`) prevalece.
+
+### 5.4 Governança da IA na Fase 3
+
+As regras IN-01 a IN-05 de `CONTEXT_RULES.md` valem para qualquer arquivo de infraestrutura
+gerado com IA: nada de `continue-on-error`, `|| true` ou testes pulados para forçar build verde,
+nenhum segredo no repositório e nenhuma imagem base diferente da especificada.
