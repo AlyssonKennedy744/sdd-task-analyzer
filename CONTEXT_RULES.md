@@ -16,6 +16,7 @@ fornecidas ao agente de IA no início de **toda** sessão.
 
 - Bibliotecas externas; persistência; alterar assinaturas públicas; alterar testes;
   alterar a estrutura de pastas; assumir comportamento não especificado; usar `print`.
+- Mascarar falhas no CI (`continue-on-error`, `|| true`, `-k`/`skip` em testes) ou versionar segredos.
 
 ## Fluxo
 
@@ -65,3 +66,14 @@ fornecidas ao agente de IA no início de **toda** sessão.
 | RI-04 | Revisar criticamente todo código gerado; a IA é executora, o desenvolvedor é o homologador. |
 | RI-05 | Rejeitar respostas que violem as proibições ou o contrato e registrar o motivo no PR. |
 | RI-06 | Registrar no `README.md` quais trechos foram gerados por IA e quais foram revisados/ajustados. |
+
+## 4. Regras de Infraestrutura e Entrega (Fase 3)
+
+| ID | Regra |
+|----|-------|
+| IN-01 | Nenhum merge em `develop` ou `main` sem o workflow `CI` verde (13 passed). |
+| IN-02 | O pipeline deve executar exatamente `pytest tests/test_harness.py -v`; é proibido `continue-on-error`, `\|\| true`, `--deselect`, `skip` ou filtros que escondam testes. |
+| IN-03 | A imagem Docker usa somente `python:3.11-slim` e as dependências de `requirements.txt`; nada de pacotes extras "por garantia". |
+| IN-04 | O container roda como usuário não-root, sem rede e com sistema de arquivos somente leitura (`docker-compose.yml`). |
+| IN-05 | Nenhum segredo, token ou credencial em arquivos versionados; o workflow usa `permissions: contents: read`. |
+| IN-06 | Arquivos de infraestrutura gerados por IA seguem o mesmo fluxo RI-01 a RI-06: contexto completo, revisão humana e registro no PR. |
