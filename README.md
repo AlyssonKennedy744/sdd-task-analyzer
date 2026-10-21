@@ -1,12 +1,13 @@
 # sdd-task-analyzer — TaskAnalyzer
 
-> **Bootcamp III** — Fase 2: Implementação com IA, Test Harness e Versionamento no GitHub
+> **Bootcamp III** — Fase 3 (Final): DevOps, Testes Automatizados, Containerização e Governança Ética de IA
 > **Aluno:** Alysson Kennedy De Oliveira Carvalho — RA 22450680
 > **Curso:** Ciência da Computação
 
+[![CI](https://github.com/AlyssonKennedy744/sdd-task-analyzer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AlyssonKennedy744/sdd-task-analyzer/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Testes](https://img.shields.io/badge/pytest-13%20passed-brightgreen)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Docker](https://img.shields.io/badge/docker-python%3A3.11--slim-2496ED)
 
 ## Visão geral
 
@@ -19,35 +20,74 @@ Ele recebe uma lista de tarefas (datas, prazo, prioridade e status) e calcula, s
 
 O código foi gerado com assistente de IA guiado por `CONTEXT_RULES.md` e pelo contrato
 `specs/task_analyzer_spec.md`, e validado pelo Test Harness em `tests/test_harness.py`.
+Na Fase 3 o projeto ganhou **pipeline de CI no GitHub Actions** e **execução isolada em Docker**,
+de modo que os 13 testes rodam automaticamente a cada push/PR e com um único comando em qualquer máquina.
 
 ## Estrutura do repositório
 
 ```
 sdd-task-analyzer/
-├── README.md                 # Este arquivo: visão geral, execução e status do build
-├── CONTEXT_RULES.md          # Regras de governança da IA (transpostas da Fase 1)
-├── .gitignore                # __pycache__/, .pytest_cache/, venv/ etc.
-├── requirements.txt          # Dependências autorizadas (pytest)
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # Motor CI/CD (GitHub Actions)
+├── Dockerfile                        # Empacotamento (python:3.11-slim, usuário não-root)
+├── docker-compose.yml                # Orquestração: docker compose run --rm tests
+├── .dockerignore
+├── CONTEXT_RULES.md                  # Base de governança da IA (Fase 1 + regras IN da Fase 3)
 ├── specs/
-│   └── task_analyzer_spec.md # Contrato SDD (Fase 1 + adendo Fase 2)
+│   ├── system_design_document.pdf    # SDD consolidado (Fases 1 a 3)
+│   ├── requirements.yaml             # Requisitos em formato estruturado
+│   └── task_analyzer_spec.md         # Contrato executável (fonte da verdade)
 ├── tests/
-│   └── test_harness.py       # Test Harness com pytest (Cenários 1, 2 e casos de borda)
-└── src/
-    └── task_analyzer.py      # Código gerado via IA e homologado
+│   └── test_harness.py               # Test Harness com pytest (13 testes)
+├── src/
+│   └── task_analyzer.py              # Código gerado via IA e homologado
+├── .gitignore
+├── requirements.txt                  # Dependências autorizadas (pytest)
+└── README.md
 ```
 
 ## Como executar
 
-Pré-requisitos: Python 3.11+ e Git.
+### Opção 1 — Docker (recomendado)
+
+Pré-requisito: Docker com Docker Compose v2.
 
 ```bash
 git clone https://github.com/AlyssonKennedy744/sdd-task-analyzer.git
 cd sdd-task-analyzer
-python -m pip install -r requirements.txt
-python -m pytest -v
+docker compose run --rm tests
 ```
 
-Resultado esperado: `13 passed` (100 % de aprovação).
+Ou, sem o Compose:
+
+```bash
+docker build -t sdd-task-analyzer .
+docker run --rm sdd-task-analyzer
+```
+
+### Opção 2 — Local
+
+Pré-requisitos: Python 3.11+ e Git.
+
+```bash
+python -m pip install -r requirements.txt
+pytest tests/test_harness.py -v
+```
+
+Resultado esperado nas duas opções: `13 passed` (100 % de aprovação).
+
+## Integração Contínua (GitHub Actions)
+
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em todo `push` e `pull_request`
+para `main` e `develop`:
+
+| Job | Ambiente | Passos |
+|-----|----------|--------|
+| `test` | `ubuntu-latest` + Python 3.11 | checkout → `pip install -r requirements.txt` → `pytest tests/test_harness.py -v` |
+| `docker` | `ubuntu-latest` (depende de `test`) | `docker build` → `docker compose run --rm tests` |
+
+Nenhum PR é mesclado sem os dois jobs verdes (regra IN-01).
 
 ## Exemplo de uso
 
@@ -88,6 +128,9 @@ Também está disponível a API tipada do contrato da Fase 1: `analisar_tarefas(
 | `CONTEXT_RULES.md` | Humano (Fase 1) | — |
 | `src/task_analyzer.py` | Gerado por IA a partir da spec + CONTEXT_RULES | Conferência de assinaturas, tipos, exceções, arredondamento e logging |
 | `tests/test_harness.py` | Cenários definidos pelo humano; código de teste sugerido pela IA | Conferência 1:1 com a seção 2 da spec (PR-02) |
+| `.github/workflows/ci.yml` | Gerado por IA a partir do adendo 5.1 da spec | Gatilhos, versão do Python, comando exato do pytest, ausência de `continue-on-error` (IN-02) |
+| `Dockerfile` / `docker-compose.yml` | Gerados por IA a partir do adendo 5.2 da spec | Imagem `python:3.11-slim`, usuário não-root, sem rede, FS somente leitura (IN-03/IN-04) |
+| `specs/requirements.yaml` / `system_design_document.pdf` | Derivados da spec pelo humano com apoio da IA | Valores esperados conferidos com a seção 2 da spec |
 
 Pontos da homologação:
 
@@ -100,5 +143,6 @@ Pontos da homologação:
 
 ## Fluxo de versionamento
 
-`feature/*` → Pull Request → `develop` → Pull Request → `main` (tag `v0.1.0`).
-Commits no padrão Conventional Commits.
+`feature/*` → Pull Request → `develop` → Pull Request → `main`.
+Tags: `v0.1.0` (Fase 2) e `v1.0.0` (Fase 3, com CI e Docker).
+Commits no padrão Conventional Commits; merge somente com o workflow `CI` verde.
